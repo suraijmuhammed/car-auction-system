@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚗 Car Auction System - Live Bidding</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 1.1em; }
+        
+        /* Logout button in header */
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: none;
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        .logout-btn.show { display: block; }
+        
+        .auth-section, .auction-section { padding: 30px; }
+        .auth-section { background: #f8f9fa; }
+        
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .auth-tabs button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: #e9ecef;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .auth-tabs button.active { background: #007bff; color: white; }
+        
+        .auth-form {
+            display: grid;
+            gap: 15px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .auth-form input {
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        .auth-form input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        .auth-form button {
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .auth-form button:hover { background: #0056b3; }
+        
+        .auction-room {
+            display: none;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        .auction-room.active { display: grid; }
+        
+        .auction-main {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .auction-sidebar {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+        }
+        
+        .current-bid {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .current-bid h2 { font-size: 2.5em; margin-bottom: 5px; }
+        .current-bid p { opacity: 0.9; }
+        
+        .bid-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        .bid-form input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .bid-form button {
+            padding: 12px 24px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .bid-form button:hover { background: #ff5252; }
+        
+        .bid-history {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .bid-item {
+            background: white;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #007bff;
+            border-radius: 0 5px 5px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .bid-item.own-bid { border-left-color: #28a745; background: #f8fff8; }
+        
+        .status {
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        
+        .auction-list {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .auction-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .auction-card:hover { transform: translateY(-2px); }
+        
+        /* Back to auctions button */
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+        .back-btn:hover { background: #5a6268; }
+        
+        @media (max-width: 768px) {
+            .auction-room { grid-template-columns: 1fr; }
+            .container { margin: 10px; }
+            .auth-form { max-width: 100%; }
+            .logout-btn {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin-top: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 Car Auction System</h1>
+            <p>Live Bidding Platform with Real-time Updates</p>
+            <button class="logout-btn" id="logoutBtn" onclick="logout()">👋 Logout</button>
+        </div>
+        
+        <!-- Authentication Section -->
+        <div class="auth-section" id="authSection">
+            <div class="auth-tabs">
+                <button class="active" onclick="switchTab('login')">Login</button>
+                <button onclick="switchTab('register')">Register</button>
+            </div>
+            
+            <div class="auth-form" id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Email" value="john@example.com">
+                <input type="password" id="loginPassword" placeholder="Password" value="password123">
+                <button onclick="login()">Login</button>
+            </div>
+            
+            <div class="auth-form" id="registerForm" style="display: none;">
+                <input type="text" id="regUsername" placeholder="Username">
+                <input type="email" id="regEmail" placeholder="Email">
+                <input type="password" id="regPassword" placeholder="Password (min 6 chars)">
+                <input type="text" id="regFullName" placeholder="Full Name (optional)">
+                <button onclick="register()">Register</button>
+            </div>
+            
+            <div class="status" id="authStatus" style="display: none;"></div>
+        </div>
+
+        <!-- Auction Section -->
+        <div class="auction-section">
+            <div id="auctionList">
+                <h2>Available Auctions</h2>
+                <div class="auction-list" id="auctionsContainer">
+                    <div class="status info">Loading auctions...</div>
+                </div>
+            </div>
+            
+            <div class="auction-room" id="auctionRoom">
+                <div class="auction-main">
+                    <button class="back-btn" onclick="backToAuctions()">← Back to Auctions</button>
+                    
+                    <div class="current-bid">
+                        <h2>$<span id="currentHighest">0</span></h2>
+                        <p>Current Highest Bid by <span id="currentBidder">No bids yet</span></p>
+                    </div>
+                    
+                    <div class="bid-form">
+                        <input type="number" id="bidAmount" placeholder="Enter your bid amount" min="1" step="0.01">
+                        <button onclick="placeBid()" id="bidButton">Place Bid</button>
+                    </div>
+                    
+                    <div class="status" id="bidStatus" style="display: none;"></div>
+                </div>
+                
+                <div class="auction-sidebar">
+                    <h3>Bid History</h3>
+                    <div class="bid-history" id="bidHistory">
+                        <div class="status info">Join an auction to see bid history</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.0/socket.io.min.js"></script>
+    <script>
+        let socket;
+        let authToken = localStorage.getItem('authToken');
+        let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        let currentAuctionId = null;
+        
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            if (authToken && currentUser) {
+                showAuctionSection();
+                loadAuctions();
+            }
+        });
+
+        // Authentication Functions
+        function switchTab(tab) {
+            document.querySelectorAll('.auth-tabs button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (tab === 'login') {
+                document.getElementById('loginForm').style.display = 'grid';
+                document.getElementById('registerForm').style.display = 'none';
+            } else {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('registerForm').style.display = 'grid';
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                showAuthStatus('Please enter email and password', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:3000/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.access_token;
+                    currentUser = data.user;
+                    localStorage.setItem('authToken', authToken);
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    
+                    showAuthStatus(data.message, 'success');
+                    setTimeout(() => {
+                        showAuctionSection();
+                        loadAuctions();
+                    }, 1000);
+                } else {
+                    showAuthStatus(data.message || 'Login failed', 'error');
+                }
+            } catch (error) {
+                showAuthStatus('Connection error: ' + error.message, 'error');
+            }
+        }
+
+        async function register() {
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const fullName = document.getElementById('regFullName').value;
+            
+            if (!username || !email || !password) {
+                showAuthStatus('Please fill in required fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:3000/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password, fullName })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.access_token;
+                    currentUser = data.user;
+                    localStorage.setItem('authToken', authToken);
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    
+                    showAuthStatus(data.message, 'success');
+                    setTimeout(() => {
+                        showAuctionSection();
+                        loadAuctions();
+                    }, 1000);
+                } else {
+                    showAuthStatus(data.message || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                showAuthStatus('Connection error: ' + error.message, 'error');
+            }
+        }
+
+        // LOGOUT FUNCTION
+        function logout() {
+            // Disconnect WebSocket if connected
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            
+            // Clear local storage
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            
+            // Reset global variables
+            authToken = null;
+            currentUser = null;
+            currentAuctionId = null;
+            
+            // Reset UI
+            showAuthSection();
+            clearForms();
+            
+            // Show success message
+            showAuthStatus('👋 Logged out successfully!', 'success');
+            
+            console.log('User logged out successfully');
+        }
+
+        function showAuthStatus(message, type) {
+            const statusEl = document.getElementById('authStatus');
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+            statusEl.style.display = 'block';
+        }
+
+        function showAuctionSection() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('logoutBtn').classList.add('show');
+            document.querySelector('.header p').textContent = `Welcome back, ${currentUser.username}! 👋`;
+        }
+
+        function showAuthSection() {
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('auctionList').style.display = 'block';
+            document.getElementById('auctionRoom').classList.remove('active');
+            document.getElementById('logoutBtn').classList.remove('show');
+            document.querySelector('.header h1').textContent = '🚗 Car Auction System';
+            document.querySelector('.header p').textContent = 'Live Bidding Platform with Real-time Updates';
+        }
+
+        function clearForms() {
+            // Clear auth forms
+            document.getElementById('loginEmail').value = '';
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('regUsername').value = '';
+            document.getElementById('regEmail').value = '';
+            document.getElementById('regPassword').value = '';
+            document.getElementById('regFullName').value = '';
+            
+            // Clear bid form
+            document.getElementById('bidAmount').value = '';
+            
+            // Clear bid history
+            document.getElementById('bidHistory').innerHTML = '<div class="status info">Join an auction to see bid history</div>';
+            
+            // Reset current bid display
+            document.getElementById('currentHighest').textContent = '0';
+            document.getElementById('currentBidder').textContent = 'No bids yet';
+        }
+
+        // Auction Functions
+        async function loadAuctions() {
+            try {
+                const response = await fetch('http://localhost:3000/auctions');
+                const auctions = await response.json();
+                
+                const container = document.getElementById('auctionsContainer');
+                if (auctions.length === 0) {
+                    container.innerHTML = '<div class="status info">No active auctions at the moment</div>';
+                    return;
+                }
+                
+                container.innerHTML = auctions.map(auction => `
+                    <div class="auction-card" onclick="joinAuction('${auction.id}', '${auction.carId}')">
+                        <h3>🏎️ ${auction.carId}</h3>
+                        <p><strong>Starting Bid:</strong> $${auction.startingBid.toLocaleString()}</p>
+                        <p><strong>Current Highest:</strong> $${auction.currentHighestBid.toLocaleString()}</p>
+                        <p><strong>Status:</strong> ${auction.status}</p>
+                        <p><strong>Ends:</strong> ${new Date(auction.endTime).toLocaleDateString()}</p>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                document.getElementById('auctionsContainer').innerHTML = 
+                    '<div class="status error">Failed to load auctions</div>';
+            }
+        }
+
+        function backToAuctions() {
+            // Disconnect from current auction
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            
+            // Reset UI
+            document.getElementById('auctionList').style.display = 'block';
+            document.getElementById('auctionRoom').classList.remove('active');
+            document.querySelector('.header h1').textContent = '🚗 Car Auction System';
+            
+            // Clear current auction
+            currentAuctionId = null;
+            
+            // Reload auctions
+            loadAuctions();
+        }
+
+        // WebSocket Functions
+        function joinAuction(auctionId, carId) {
+            currentAuctionId = auctionId;
+            
+            // Initialize WebSocket connection
+            if (socket) socket.disconnect();
+            
+            socket = io('http://localhost:3000/auction', {
+                auth: { token: authToken },
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                console.log('Connected to auction WebSocket');
+                socket.emit('joinAuction', { auctionId });
+                
+                document.getElementById('auctionList').style.display = 'none';
+                document.getElementById('auctionRoom').classList.add('active');
+                document.querySelector('.header h1').textContent = `🚗 ${carId}`;
+            });
+
+            socket.on('connected', (data) => {
+                showBidStatus(data.message, 'success');
+            });
+
+            socket.on('joinedAuction', (data) => {
+                showBidStatus(`Joined auction: ${data.auctionId}`, 'success');
+            });
+
+            socket.on('currentHighestBid', (data) => {
+                updateCurrentBid(data.amount, data.username);
+            });
+
+            socket.on('newBid', (data) => {
+                updateCurrentBid(data.amount, data.username);
+                addBidToHistory(data);
+                
+                if (data.userId === currentUser.id) {
+                    showBidStatus('Your bid was placed successfully! 🎉', 'success');
+                } else {
+                    showBidStatus(`New bid: $${data.amount} by ${data.username}`, 'info');
+                }
+            });
+
+            socket.on('bidPlaced', (data) => {
+                showBidStatus(data.message, 'success');
+                document.getElementById('bidAmount').value = '';
+            });
+
+            socket.on('bidError', (data) => {
+                showBidStatus(data.message, 'error');
+            });
+
+            socket.on('auctionEnded', (data) => {
+                showBidStatus(data.message, 'info');
+                document.getElementById('bidButton').disabled = true;
+            });
+
+            socket.on('error', (data) => {
+                showBidStatus(data.message, 'error');
+            });
+        }
+
+        function placeBid() {
+            const amount = parseFloat(document.getElementById('bidAmount').value);
+
+            if (!amount || amount <= 0) {
+                showBidStatus('Please enter a valid bid amount', 'error');
+                return;
+            }
+
+            if (!socket || !currentAuctionId) {
+                showBidStatus('Please join an auction first', 'error');
+                return;
+            }
+
+            socket.emit('placeBid', {
+                auctionId: currentAuctionId,
+                amount: amount
+            });
+
+            showBidStatus('Placing bid...', 'info');
+        }
+
+        function updateCurrentBid(amount, username) {
+            document.getElementById('currentHighest').textContent = amount.toLocaleString();
+            document.getElementById('currentBidder').textContent = username;
+        }
+
+        function addBidToHistory(bidData) {
+            const history = document.getElementById('bidHistory');
+            const isOwnBid = bidData.userId === currentUser.id;
+            
+            const bidElement = document.createElement('div');
+            bidElement.className = 'bid-item' + (isOwnBid ? ' own-bid' : '');
+            bidElement.innerHTML = `
+                <div><strong>$${bidData.amount.toLocaleString()}</strong> ${isOwnBid ? '(You)' : 'by ' + bidData.username}</div>
+                <div><small>${new Date(bidData.timestamp).toLocaleTimeString()}</small></div>
+            `;
+            
+            if (history.firstChild) {
+                history.insertBefore(bidElement, history.firstChild);
+            } else {
+                history.appendChild(bidElement);
+            }
+        }
+
+        function showBidStatus(message, type) {
+            const statusEl = document.getElementById('bidStatus');
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Handle Enter key in bid input
+        document.getElementById('bidAmount')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                placeBid();
+            }
+        });
+    </script>
+</body>
+</html>
