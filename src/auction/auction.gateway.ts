@@ -31,7 +31,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
   server: Server;
 
   private connectedUsers = new Map<string, AuthenticatedSocket>();
-  private rateLimiter = new Map<string, { count: number; resetTime: number }>();
+  private auctionRooms = new Map<string, Set<string>>();
 
   constructor(
     private bidService: BidService,
@@ -41,7 +41,6 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
-      // Extract JWT token from handshake
       const token = client.handshake.auth.token || 
                    client.handshake.headers.authorization?.split(' ')[1];
 
@@ -51,7 +50,6 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
         return;
       }
 
-      // Verify JWT token
       const payload = this.jwtService.verify(token);
       client.user = {
         id: payload.sub,
@@ -60,17 +58,23 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
       };
 
       this.connectedUsers.set(client.user.id, client);
-      await this.redis.setUserSession(client.user.id, client.id);
+      
+      // ✅ Enhanced: Store user session with socket info
+      await this.redis.setUserSession(client.user.id, {
+        socketId: client.id,
+        connectedAt: new Date(),
+        username: client.user.username
+      });
 
       console.log(`👤 User connected: ${client.user.username} (${client.id})`);
       client.emit('connected', { 
-        message: `Welcome ${client.user.username}!`,
+        message: `Welcome back, ${client.user.username}!`,
         user: client.user 
       });
 
     } catch (error) {
       console.error('Authentication failed:', error.message);
-      client.emit('error', { message: 'Invalid token' });
+      client.emit('error', { message: 'Invalid authentication token' });
       client.disconnect();
     }
   }
@@ -78,6 +82,15 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
   async handleDisconnect(client: AuthenticatedSocket) {
     if (client.user) {
       this.connectedUsers.delete(client.user.id);
+      
+      // Remove from auction rooms
+      this.auctionRooms.forEach((users, auctionId) => {
+        users.delete(client.user.id);
+        if (users.size === 0) {
+          this.auctionRooms.delete(auctionId);
+        }
+      });
+      
       console.log(`👋 User disconnected: ${client.user.username}`);
     }
   }
@@ -90,26 +103,41 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     const { auctionId } = data;
     
     if (!client.user) {
-      client.emit('error', { message: 'Not authenticated' });
+      client.emit('error', { message: 'Authentication required' });
       return;
     }
 
     // Join auction room
     await client.join(`auction-${auctionId}`);
     
-    // Send current highest bid
-    const highestBid = await this.redis.getHighestBid(auctionId);
+    // Track users in auction room
+    if (!this.auctionRooms.has(auctionId)) {
+      this.auctionRooms.set(auctionId, new Set());
+    }
+    this.auctionRooms.get(auctionId).add(client.user.id);
+
+    // ✅ Enhanced: Send complete auction data including persistent history
+    const [highestBid, bidHistory, auctionStats] = await Promise.all([
+      this.redis.getHighestBid(auctionId),
+      this.bidService.getAuctionBids(auctionId),
+      this.bidService.getAuctionStats(auctionId)
+    ]);
+
+    client.emit('joinedAuction', { 
+      auctionId,
+      message: `Joined auction ${auctionId}`,
+      userCount: this.auctionRooms.get(auctionId).size,
+      stats: auctionStats
+    });
+
     if (highestBid) {
       client.emit('currentHighestBid', highestBid);
     }
 
-    client.emit('joinedAuction', { 
-      auctionId, 
-      message: `Joined auction ${auctionId}`,
-      user: client.user.username
-    });
+    // ✅ Send complete bid history from database
+    client.emit('bidHistory', bidHistory);
 
-    console.log(`🏛️ ${client.user.username} joined auction ${auctionId}`);
+    console.log(`🏛️ ${client.user.username} joined auction ${auctionId} (${this.auctionRooms.get(auctionId).size} users)`);
   }
 
   @SubscribeMessage('placeBid')
@@ -118,42 +146,71 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @MessageBody() data: { auctionId: string; amount: number },
   ) {
     if (!client.user) {
-      client.emit('error', { message: 'Not authenticated' });
+      client.emit('error', { message: 'Authentication required' });
       return;
     }
 
-    // Rate limiting check
-    if (!this.checkRateLimit(client.id)) {
-      client.emit('bidError', { message: 'Too many requests. Please wait before placing another bid.' });
+    // ✅ Enhanced: Progressive rate limiting
+    const rateLimitKey = `bid:${client.user.id}:${data.auctionId}`;
+    if (!await this.redis.checkRateLimit(rateLimitKey, 5, 30)) {
+      client.emit('bidError', { 
+        message: 'Too many bid attempts. Please wait 30 seconds before trying again.',
+        code: 'RATE_LIMIT_EXCEEDED'
+      });
       return;
     }
 
     try {
       const bidData = {
         ...data,
-        userId: client.user.id, // Use authenticated user ID
+        userId: client.user.id,
       };
 
       const bid = await this.bidService.placeBid(bidData);
       
-      // Broadcast to all clients in the auction room
+      // ✅ Enhanced: Broadcast with user count and stats
+      const userCount = this.auctionRooms.get(data.auctionId)?.size || 0;
+      
       this.server.to(`auction-${data.auctionId}`).emit('newBid', {
         bidId: bid.id,
         amount: bid.amount,
         userId: bid.userId,
         username: bid.user.username,
+        fullName: bid.user.fullName,
         timestamp: bid.timestamp,
+        userCount,
       });
 
       client.emit('bidPlaced', { 
         success: true, 
         bidId: bid.id,
-        message: `Bid of $${bid.amount} placed successfully!`
+        message: `Bid of $${bid.amount.toLocaleString()} placed successfully!`
       });
 
     } catch (error) {
       console.error('Bid error:', error.message);
-      client.emit('bidError', { message: error.message });
+      client.emit('bidError', { 
+        message: error.message,
+        code: 'BID_VALIDATION_ERROR'
+      });
+    }
+  }
+
+  @SubscribeMessage('getBidHistory')
+  async handleGetBidHistory(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { auctionId: string },
+  ) {
+    if (!client.user) {
+      client.emit('error', { message: 'Authentication required' });
+      return;
+    }
+
+    try {
+      const bidHistory = await this.bidService.getAuctionBids(data.auctionId);
+      client.emit('bidHistory', bidHistory);
+    } catch (error) {
+      client.emit('error', { message: 'Failed to load bid history' });
     }
   }
 
@@ -162,30 +219,11 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { auctionId: string; winnerId: string; winningBid: number },
   ) {
-    // Notify all clients in the auction room
     this.server.to(`auction-${data.auctionId}`).emit('auctionEnded', {
       auctionId: data.auctionId,
       winnerId: data.winnerId,
       winningBid: data.winningBid,
-      message: '🎉 Auction has ended!',
+      message: '🏆 Auction completed!',
     });
-  }
-
-  // Rate limiting for DDoS protection
-  private checkRateLimit(clientId: string): boolean {
-    const now = Date.now();
-    const limit = this.rateLimiter.get(clientId);
-
-    if (!limit || now > limit.resetTime) {
-      this.rateLimiter.set(clientId, { count: 1, resetTime: now + 60000 }); // 1 minute window
-      return true;
-    }
-
-    if (limit.count >= 10) { // 10 requests per minute
-      return false;
-    }
-
-    limit.count++;
-    return true;
   }
 }
