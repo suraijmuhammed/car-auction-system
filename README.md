@@ -21,13 +21,13 @@ Enterprise-grade real-time car auction platform built with NestJS, React, and We
 ##  Quick Start
 
 # Backend
-docker-compose up -d
-npm install
-npx prisma migrate dev
-npm run seed
-npm run start:dev
+docker-compose up -d ,
+npm install ,
+npx prisma migrate dev ,
+npm run seed ,
+npm run start:dev ,
 
 # Frontend  
-cd frontend
-npm install
+cd frontend ,
+npm install ,
 npm start
