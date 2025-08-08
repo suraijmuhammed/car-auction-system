@@ -49,7 +49,7 @@ async function main() {
   // Create enhanced auctions with car details
   console.log('Creating enhanced auctions...');
   const now = new Date();
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tenMinutesLater = new Date(now.getTime() + 10 * 60 * 1000);
 
   const auctions = await Promise.all([
     prisma.auction.create({
@@ -57,7 +57,7 @@ async function main() {
         id: 'luxury-ferrari-2023',
         carId: 'ferrari-f8-tributo-2023',
         startTime: now,
-        endTime: tomorrow,
+        endTime: tenMinutesLater,
         startingBid: 250000,
         currentHighestBid: 250000,
         status: 'ACTIVE',
@@ -77,7 +77,7 @@ async function main() {
         id: 'lamborghini-special',
         carId: 'lamborghini-huracan-evo-2023',
         startTime: now,
-        endTime: tomorrow,
+        endTime: tenMinutesLater,
         startingBid: 200000,
         currentHighestBid: 200000,
         status: 'ACTIVE',
@@ -97,7 +97,7 @@ async function main() {
         id: 'porsche-gt3-rare',
         carId: 'porsche-911-gt3-rs-2023',
         startTime: now,
-        endTime: tomorrow,
+        endTime: tenMinutesLater,
         startingBid: 180000,
         currentHighestBid: 180000,
         status: 'ACTIVE',

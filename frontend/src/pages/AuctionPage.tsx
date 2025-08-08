@@ -62,10 +62,26 @@ function AuctionPage() {
   
   const [bidHistory, setBidHistory] = useState<Bid[]>([]);
   const [currentHighestBid, setCurrentHighestBid] = useState<number>(0);
-  const [userCount, setUserCount] = useState<number>(0);
   const [isLiked, setIsLiked] = useState(false);
+  
+  // Real-time timer and auction end state
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [auctionEnded, setAuctionEnded] = useState(false);
+  
+  //  Calculate actual bidder count from bid history
+  const [bidderCount, setBidderCount] = useState(0);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<BidFormData>();
+  const { register, handleSubmit, reset, formState: { errors }, setValue } = useForm<BidFormData>();
+
+  //  Calculate actual bidder count from bid history
+  useEffect(() => {
+    if (bidHistory.length > 0) {
+      const uniqueBidders = new Set(bidHistory.map(bid => bid.user.id));
+      setBidderCount(uniqueBidders.size);
+    } else {
+      setBidderCount(0);
+    }
+  }, [bidHistory]);
 
   // Fetch auction data
   const { data: auction, isLoading, error } = useQuery<Auction>(
@@ -88,21 +104,21 @@ function AuctionPage() {
     if (socket && id && isConnected) {
       joinAuction(id);
 
-      // Listen for real-time bid updates
+      //  Removed userCount socket handling
       socket.on('joinedAuction', (data) => {
-        console.log('✅ Joined auction:', data);
-        setUserCount(data.userCount || 0);
+        console.log(' Joined auction:', data);
+        
       });
 
       socket.on('currentHighestBid', (data) => {
         setCurrentHighestBid(data.amount);
       });
 
+      //  Removed userCount from newBid handler
       socket.on('newBid', (data) => {
         setCurrentHighestBid(data.amount);
-        setUserCount(data.userCount || 0);
+        // userCount will be recalculated from bidHistory
         
-        // Add new bid to history
         const newBid: Bid = {
           id: data.bidId,
           amount: data.amount,
@@ -141,8 +157,32 @@ function AuctionPage() {
     }
   }, [socket, id, isConnected, user?.id, joinAuction]);
 
-  // Time remaining calculation
-  const timeRemaining = auction ? new Date(auction.endTime).getTime() - new Date().getTime() : 0;
+  // 🔧 ADDED: Real-time timer that updates every second
+  useEffect(() => {
+    if (!auction) return;
+
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const endTime = new Date(auction.endTime).getTime();
+      const remaining = endTime - now;
+      
+      setTimeRemaining(Math.max(0, remaining));
+      
+      if (remaining <= 0 && !auctionEnded) {
+        setAuctionEnded(true);
+        toast.success('Auction has ended!', { duration: 5000 });
+      }
+    };
+
+    // Update immediately
+    updateTimer();
+    
+    // Update every second
+    const interval = setInterval(updateTimer, 1000);
+    
+    return () => clearInterval(interval);
+  }, [auction, auctionEnded]);
+
   const hoursRemaining = Math.floor(timeRemaining / (1000 * 60 * 60));
   const minutesRemaining = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
   const secondsRemaining = Math.floor((timeRemaining % (1000 * 60)) / 1000);
@@ -157,11 +197,16 @@ function AuctionPage() {
     }).format(amount);
   };
 
-  // Handle bid submission
-    const onSubmit = (data: BidFormData) => {
+  //  Handle bid submission with auction end check
+  const onSubmit = (data: BidFormData) => {
     if (!auction) return;
     
-    // ✅ Ensure we're sending a number
+    // Check if auction has ended
+    if (auctionEnded || timeRemaining <= 0) {
+      toast.error(' This auction has ended. No more bids allowed.');
+      return;
+    }
+    
     const bidAmount = Number(data.amount);
     const minimumBid = Math.max(auction.startingBid, currentHighestBid);
     
@@ -174,7 +219,6 @@ function AuctionPage() {
         toast.error(`Bid must be higher than ${formatCurrency(minimumBid)}`);
         return;
     }
-
 
     placeBid(auction.id, bidAmount);
     reset();
@@ -275,31 +319,48 @@ function AuctionPage() {
                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
                 <span className="text-green-600 font-semibold">LIVE AUCTION</span>
               </div>
+              {/* Show accurate bidder count */}
               <div className="flex items-center space-x-2 text-gray-600">
                 <Users className="h-4 w-4" />
-                <span className="text-sm">{userCount} bidders</span>
+                <span className="text-sm">
+                  {bidderCount > 0 ? `${bidderCount} bidders` : 'No bidders yet'}
+                </span>
               </div>
             </div>
 
-            {/* Time Remaining */}
+            {/*  Time Remaining - Enhanced with auction end handling */}
             <div className="text-center mb-6">
-              <div className="text-sm text-gray-600 mb-2">Time Remaining</div>
-              <div className="text-2xl font-bold text-gray-900 flex items-center justify-center space-x-4">
-                <div className="text-center">
-                  <div>{hoursRemaining.toString().padStart(2, '0')}</div>
-                  <div className="text-xs text-gray-500">HOURS</div>
-                </div>
-                <div className="text-gray-400">:</div>
-                <div className="text-center">
-                  <div>{minutesRemaining.toString().padStart(2, '0')}</div>
-                  <div className="text-xs text-gray-500">MINS</div>
-                </div>
-                <div className="text-gray-400">:</div>
-                <div className="text-center">
-                  <div>{secondsRemaining.toString().padStart(2, '0')}</div>
-                  <div className="text-xs text-gray-500">SECS</div>
-                </div>
+              <div className="text-sm text-gray-600 mb-2">
+                {auctionEnded ? 'Auction Ended' : 'Time Remaining'}
               </div>
+              {auctionEnded ? (
+                <div className="text-3xl font-bold text-red-600 mb-4">
+                  🏆 AUCTION ENDED
+                </div>
+              ) : (
+                <div className="text-2xl font-bold text-gray-900 flex items-center justify-center space-x-4">
+                  <div className="text-center">
+                    <div className={timeRemaining < 60000 ? 'text-red-600 animate-pulse' : ''}>
+                      {hoursRemaining.toString().padStart(2, '0')}
+                    </div>
+                    <div className="text-xs text-gray-500">HOURS</div>
+                  </div>
+                  <div className="text-gray-400">:</div>
+                  <div className="text-center">
+                    <div className={timeRemaining < 60000 ? 'text-red-600 animate-pulse' : ''}>
+                      {minutesRemaining.toString().padStart(2, '0')}
+                    </div>
+                    <div className="text-xs text-gray-500">MINS</div>
+                  </div>
+                  <div className="text-gray-400">:</div>
+                  <div className="text-center">
+                    <div className={timeRemaining < 60000 ? 'text-red-600 animate-pulse' : ''}>
+                      {secondsRemaining.toString().padStart(2, '0')}
+                    </div>
+                    <div className="text-xs text-gray-500">SECS</div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Current Bid */}
@@ -332,7 +393,7 @@ function AuctionPage() {
                       required: 'Bid amount is required',
                       min: {
                         value: Math.max(auction.startingBid, currentHighestBid) + 1,
-                        message: `Minimum bid is ${formatCurrency(Math.max(auction.startingBid, currentHighestBid) + 1000)}`
+                        message: `Minimum bid is ${formatCurrency(Math.max(auction.startingBid, currentHighestBid) + 1)}`
                       }
                     })}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
@@ -344,23 +405,62 @@ function AuctionPage() {
                 )}
               </div>
 
+              {/*  Button state based on auction end */}
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: auctionEnded ? 1 : 1.02 }}
+                whileTap={{ scale: auctionEnded ? 1 : 0.98 }}
                 type="submit"
-                disabled={!isConnected}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                disabled={!isConnected || auctionEnded}
+                className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 ${
+                  auctionEnded 
+                    ? 'bg-gray-400 text-gray-700' 
+                    : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
+                }`}
               >
-                <Gavel className="h-5 w-5" />
-                <span>Place Bid</span>
-                <Zap className="h-5 w-5" />
+                {auctionEnded ? (
+                  <>
+                    <span> Auction Ended</span>
+                  </>
+                ) : (
+                  <>
+                    <Gavel className="h-5 w-5" />
+                    <span>Place Bid</span>
+                    <Zap className="h-5 w-5" />
+                  </>
+                )}
               </motion.button>
             </form>
 
-            {!isConnected && (
+            {!isConnected && !auctionEnded && (
               <p className="text-orange-600 text-sm text-center mt-2">
                 Connecting to live auction...
               </p>
+            )}
+            
+            {/* Enhanced auction end display with no bids handling */}
+            {auctionEnded && (
+              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                <div className="text-green-800 font-semibold mb-2">
+                  {bidHistory.length > 0 ? ' Auction Complete!' : '📋 Auction Ended'}
+                </div>
+                <div className="text-green-700 text-sm">
+                  {bidHistory.length > 0 ? (
+                    <>
+                      Winning bid: {formatCurrency(currentHighestBid)}
+                      <div className="mt-1">
+                        Winner: {bidHistory[0]?.user?.username || 'Unknown'}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-orange-700 font-medium">No bids were placed</div>
+                      <div className="mt-1">
+                        Starting bid was: {formatCurrency(auction?.startingBid || 0)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             )}
           </motion.div>
 

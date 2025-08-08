@@ -57,8 +57,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
       // Global bid event listeners
       socketInstance.on('newBid', (data: BidData) => {
-        // This will be handled by individual auction pages
-        console.log('💰 New bid received:', data);
+        console.log(' New bid received:', data);
       });
 
       socketInstance.on('bidError', (data) => {
@@ -73,10 +72,56 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         toast.success(data.message);
       });
 
+      // NEW: Listen for user-specific notifications
+      socketInstance.on('userNotification', (notification) => {
+        console.log(' Received user notification:', notification);
+        
+        // Only show notification if it's for the current user
+        if (notification.userId === user.id) {
+          const { type, title, message } = notification;
+          
+          switch (type) {
+            case 'success':
+              toast.success(message, {
+                icon: '🏆',
+                duration: 8000, // 8 seconds for winner notifications
+              });
+              break;
+              
+            case 'info':
+              toast.success(message, {
+                icon: '📋',
+                duration: 6000, // 6 seconds for info notifications
+              });
+              break;
+              
+            default:
+              toast(message, {
+                icon: '📧',
+                duration: 5000,
+              });
+          }
+        }
+      });
+
+      // NEW: Listen for auction-wide notifications
+      socketInstance.on('auctionNotification', (notification) => {
+        console.log(' Received auction notification:', notification);
+        
+        const { type, title, message } = notification;
+        
+        toast(message, {
+          icon: type === 'info' ? '📋' : '📧',
+          duration: 5000,
+        });
+      });
+
       setSocket(socketInstance);
 
       // Cleanup on unmount
       return () => {
+        socketInstance.off('userNotification');
+        socketInstance.off('auctionNotification');
         socketInstance.disconnect();
         setSocket(null);
         setIsConnected(false);
@@ -87,21 +132,21 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const joinAuction = (auctionId: string) => {
     if (socket) {
       socket.emit('joinAuction', { auctionId });
-      console.log(`🏛️ Joining auction: ${auctionId}`);
+      console.log(` Joining auction: ${auctionId}`);
     }
   };
 
   const leaveAuction = (auctionId: string) => {
     if (socket) {
       socket.emit('leaveAuction', { auctionId });
-      console.log(`🚪 Leaving auction: ${auctionId}`);
+      console.log(` Leaving auction: ${auctionId}`);
     }
   };
 
   const placeBid = (auctionId: string, amount: number) => {
     if (socket) {
       socket.emit('placeBid', { auctionId, amount });
-      console.log(`💰 Placing bid: ${amount} on auction ${auctionId}`);
+      console.log(` Placing bid: ${amount} on auction ${auctionId}`);
     }
   };
 
