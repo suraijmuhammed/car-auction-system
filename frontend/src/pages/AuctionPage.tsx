@@ -326,17 +326,17 @@ function AuctionPage() {
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
                     type="number"
-                    step="1000"
-                    min={Math.max(auction.startingBid, currentHighestBid) + 1000}
+                    step="1"
+                    min={Math.max(auction.startingBid, currentHighestBid) + 1}
                     {...register('amount', {
                       required: 'Bid amount is required',
                       min: {
-                        value: Math.max(auction.startingBid, currentHighestBid) + 1000,
+                        value: Math.max(auction.startingBid, currentHighestBid) + 1,
                         message: `Minimum bid is ${formatCurrency(Math.max(auction.startingBid, currentHighestBid) + 1000)}`
                       }
                     })}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
-                    placeholder={`${Math.max(auction.startingBid, currentHighestBid) + 1000}`}
+                    placeholder={`${Math.max(auction.startingBid, currentHighestBid) + 1}`}
                   />
                 </div>
                 {errors.amount && (

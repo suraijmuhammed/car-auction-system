@@ -16,6 +16,7 @@ interface AuthContextType {
   register: (userData: RegisterData) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
+  refreshAuth: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -37,18 +38,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Load user from localStorage on app start
+  const clearAuthData = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    delete axios.defaults.headers.common['Authorization'];
+  };
+
+  // 🛡️ ENHANCED: Verify token validity
+  const verifyToken = async (token: string): Promise<boolean> => {
+    try {
+      const response = await axios.get('/auth/verify', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.status === 200;
+    } catch (error) {
+      console.log('Token validation failed:', error);
+      return false;
+    }
+  };
+
+  
+  const refreshAuth = async () => {
     const savedToken = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('currentUser');
 
     if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+      // Verify token is still valid
+      const isValid = await verifyToken(savedToken);
+      
+      if (isValid) {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+      } else {
+        // Token expired - clear everything
+        clearAuthData();
+        toast.error('Session expired. Please log in again.');
+      }
     }
     
     setIsLoading(false);
+  };
+
+  useEffect(() => {
+    refreshAuth();
+  }, []);
+
+  // 🛡️ ENHANCED: Response interceptor for handling auth errors
+  useEffect(() => {
+    const responseInterceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        // Handle authentication errors globally
+        if (error.response?.status === 401) {
+          clearAuthData();
+          toast.error('Session expired. Please log in again.');
+        }
+        
+        // Handle foreign key constraint errors (user not found)
+        if (error.response?.data?.message?.includes('User session expired') ||
+            error.response?.data?.message?.includes('User not found')) {
+          clearAuthData();
+          toast.error('Your session has expired. Please log in again.');
+        }
+        
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(responseInterceptor);
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -71,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       const message = error.response?.data?.message || 'Login failed';
       toast.error(message);
+      clearAuthData(); // Clear any partial auth state
       return false;
     } finally {
       setIsLoading(false);
@@ -97,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       const message = error.response?.data?.message || 'Registration failed';
       toast.error(message);
+      clearAuthData(); // Clear any partial auth state
       return false;
     } finally {
       setIsLoading(false);
@@ -104,11 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
-    delete axios.defaults.headers.common['Authorization'];
+    clearAuthData();
     toast.success('👋 Logged out successfully');
   };
 
@@ -119,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     register,
     logout,
     isLoading,
+    refreshAuth,
   };
 
   return (

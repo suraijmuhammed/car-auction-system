@@ -56,7 +56,7 @@ export class AuthService {
     return {
       user: userResponse,
       access_token: token,
-      message: '🎉 Registration successful! Welcome to the auction system!',
+      message: ' Registration successful! Welcome to the auction system!',
     };
   }
 
@@ -84,7 +84,7 @@ export class AuthService {
     return {
       user: userResponse,
       access_token: token,
-      message: '✅ Login successful!',
+      message: ' Login successful!',
     };
   }
 

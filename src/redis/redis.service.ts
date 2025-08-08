@@ -16,7 +16,7 @@ export class RedisService implements OnModuleInit {
     await this.publisher.connect();
     await this.subscriber.connect();
     
-    console.log('🔴 Connected to Redis');
+    console.log('Connected to Redis');
   }
 
   // Cache current highest bid for each auction
@@ -29,7 +29,7 @@ export class RedisService implements OnModuleInit {
     return cached ? JSON.parse(cached) : null;
   }
 
-  // ✅ New: Persistent bid history in Redis
+  // New: Persistent bid history in Redis
   async addToBidHistory(auctionId: string, bidData: any): Promise<void> {
     const key = `auction:${auctionId}:history`;
     await this.client.lPush(key, JSON.stringify(bidData));
@@ -43,7 +43,7 @@ export class RedisService implements OnModuleInit {
     return history.map(item => JSON.parse(item));
   }
 
-  // ✅ Enhanced: User session with bid tracking
+  //  Enhanced: User session with bid tracking
   async setUserSession(userId: string, data: any): Promise<void> {
     await this.client.setEx(`session:${userId}`, 7200, JSON.stringify(data));
   }
@@ -53,7 +53,7 @@ export class RedisService implements OnModuleInit {
     return session ? JSON.parse(session) : null;
   }
 
-  // ✅ Enhanced: DDoS protection with progressive penalties
+  // Enhanced: DDoS protection with progressive penalties
   async checkRateLimit(identifier: string, limit: number = 10, window: number = 60): Promise<boolean> {
     const key = `rate_limit:${identifier}`;
     const current = await this.client.incr(key);

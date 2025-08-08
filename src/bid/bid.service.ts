@@ -18,10 +18,10 @@ export class BidService {
 }) {
   const { auctionId, userId, amount } = bidData;
 
-  // ✅ Convert amount to number if it's a string
+  //  Convert amount to number if it's a string
   const bidAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
   
-  // ✅ Validate the amount is a valid number
+  // Validate the amount is a valid number
   if (isNaN(bidAmount) || bidAmount <= 0) {
     throw new Error('Invalid bid amount provided');
   }
@@ -41,7 +41,7 @@ export class BidService {
       throw new Error('Auction is not active');
     }
 
-    // ✅ Use the converted number for comparison
+    // Use the converted number for comparison
     const minimumBid = Math.max(auction.startingBid, auction.currentHighestBid);
     
     if (bidAmount <= minimumBid) {
@@ -65,7 +65,7 @@ export class BidService {
       throw new Error('You cannot bid against yourself');
     }
 
-    // ✅ Create the bid with the converted number
+    // Create the bid with the converted number
     const bid = await tx.bid.create({
       data: {
         userId,
@@ -86,10 +86,10 @@ export class BidService {
     // Update auction with new highest bid
     await tx.auction.update({
       where: { id: auctionId },
-      data: { currentHighestBid: bidAmount }, // Use the converted number
+      data: { currentHighestBid: bidAmount }, 
     });
 
-    // Cache the highest bid in Redis
+    
     const bidCache = {
       bidId: bid.id,
       amount: bidAmount,
@@ -103,7 +103,7 @@ export class BidService {
     await this.redis.cacheHighestBid(auctionId, bidCache);
     await this.redis.addToBidHistory(auctionId, bidCache);
 
-    // Publish to RabbitMQ for processing
+    
     await this.rabbitmq.publishBidEvent({
       bidId: bid.id,
       auctionId,
@@ -113,7 +113,6 @@ export class BidService {
       username: bid.user.username,
     });
 
-    // Publish real-time update via Redis
     await this.redis.publishBidUpdate(auctionId, {
       bidId: bid.id,
       amount: bidAmount,
@@ -123,12 +122,12 @@ export class BidService {
       timestamp: bid.timestamp,
     });
 
-    console.log(`💰 New bid: $${bidAmount} by ${bid.user.username} on auction ${auctionId}`);
+    console.log(` New bid: $${bidAmount} by ${bid.user.username} on auction ${auctionId}`);
     return bid;
   });
 }
 
-  // ✅ Enhanced: Get complete bid history from database
+  
   async getAuctionBids(auctionId: string) {
     return await this.prisma.bid.findMany({
       where: { auctionId },
@@ -142,11 +141,11 @@ export class BidService {
         } 
       },
       orderBy: { timestamp: 'desc' },
-      take: 50, // Limit for performance
+      take: 50, 
     });
   }
 
-  // ✅ New: Get user's bid history
+  
   async getUserBidHistory(userId: string) {
     return await this.prisma.bid.findMany({
       where: { userId },
@@ -165,7 +164,7 @@ export class BidService {
     });
   }
 
-  // ✅ New: Get auction statistics
+
   async getAuctionStats(auctionId: string) {
     const [bidCount, uniqueBidders, avgBid] = await Promise.all([
       this.prisma.bid.count({ where: { auctionId } }),

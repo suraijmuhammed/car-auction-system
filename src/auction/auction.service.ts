@@ -25,7 +25,7 @@ export class AuctionService {
     const auction = await this.prisma.auction.create({
       data: {
         ...auctionData,
-        currentHighestBid: auctionData.startingBid, // ✅ Fixed: Start with starting bid
+        currentHighestBid: auctionData.startingBid, 
       },
     });
 
@@ -61,14 +61,14 @@ export class AuctionService {
     });
   }
 
-  // ✅ Enhanced: Get active auctions with car details and images
+  
   async getActiveAuctions() {
     const auctions = await this.prisma.auction.findMany({
       where: { status: 'ACTIVE' },
       orderBy: { startTime: 'asc' },
     });
 
-    // ✅ Add sample car images (in production, these would come from database)
+    
     return auctions.map(auction => ({
       ...auction,
       carImages: this.getCarImages(auction.carId),
@@ -76,7 +76,7 @@ export class AuctionService {
     }));
   }
 
-  // ✅ Helper: Get car images (sample implementation)
+  
   private getCarImages(carId: string): string[] {
     const carImageMap = {
       'ferrari-f8-tributo-2023': [
@@ -99,7 +99,7 @@ export class AuctionService {
     return carImageMap[carId] || ['https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=800'];
   }
 
-  // ✅ Helper: Get car details
+  
   private getCarDetails(carId: string): any {
     const carDetailsMap = {
       'ferrari-f8-tributo-2023': {
@@ -183,16 +183,16 @@ export class AuctionService {
         type: 'AUCTION_WON',
         userId: winningBid.userId,
         auctionId,
-        message: `🏆 Congratulations! You won the auction with a bid of $${winningBid.amount.toLocaleString()}`,
+        message: ` Congratulations! You won the auction with a bid of $${winningBid.amount.toLocaleString()}`,
       });
     }
 
-    console.log(`🏁 Auction ended: ${auctionId}, Winner: ${winningBid?.user.username || 'None'}`);
+    console.log(` Auction ended: ${auctionId}, Winner: ${winningBid?.user.username || 'None'}`);
     return updatedAuction;
   }
 
   private async processBidEvent(bidData: any) {
-    console.log('🔄 Processing bid event:', bidData);
+    console.log(' Processing bid event:', bidData);
     
     await this.rabbitmq.publishAuditLog({
       action: 'BID_PROCESSED',

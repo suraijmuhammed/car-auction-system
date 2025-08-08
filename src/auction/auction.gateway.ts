@@ -116,7 +116,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     }
     this.auctionRooms.get(auctionId).add(client.user.id);
 
-    // ✅ Enhanced: Send complete auction data including persistent history
+    
     const [highestBid, bidHistory, auctionStats] = await Promise.all([
       this.redis.getHighestBid(auctionId),
       this.bidService.getAuctionBids(auctionId),
@@ -134,7 +134,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
       client.emit('currentHighestBid', highestBid);
     }
 
-    // ✅ Send complete bid history from database
+    
     client.emit('bidHistory', bidHistory);
 
     console.log(`🏛️ ${client.user.username} joined auction ${auctionId} (${this.auctionRooms.get(auctionId).size} users)`);
@@ -150,7 +150,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
       return;
     }
 
-    // ✅ Enhanced: Progressive rate limiting
+    
     const rateLimitKey = `bid:${client.user.id}:${data.auctionId}`;
     if (!await this.redis.checkRateLimit(rateLimitKey, 5, 30)) {
       client.emit('bidError', { 
@@ -161,10 +161,10 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     }
 
     try {
-      // ✅ Convert amount to number
+   
       const amount = typeof data.amount === 'string' ? parseFloat(data.amount) : data.amount;
       
-      // ✅ Validate amount
+      
       if (isNaN(amount) || amount <= 0) {
         client.emit('bidError', { 
           message: 'Please enter a valid bid amount',

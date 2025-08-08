@@ -12,10 +12,10 @@ export class RabbitmqService implements OnModuleInit {
       this.channel = await this.connection.createChannel();
       
       await this.setupQueues();
-      console.log('🐰 Connected to RabbitMQ');
+      console.log('Connected to RabbitMQ');
     } catch (error) {
-      console.error('❌ Failed to connect to RabbitMQ:', error);
-      console.log('💡 Make sure RabbitMQ is running: docker-compose up -d');
+      console.error('Failed to connect to RabbitMQ:', error);
+      console.log('Make sure RabbitMQ is running: docker-compose up -d');
     }
   }
 

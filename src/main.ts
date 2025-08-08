@@ -13,10 +13,10 @@ async function bootstrap() {
   });
   
   await app.listen(3000);
-  console.log('🚗 Car Auction System started on http://localhost:3000');
-  console.log('📱 WebSocket: ws://localhost:3000/auction');
-  console.log('🔑 Register at: POST /auth/register');
-  console.log('🔐 Login at: POST /auth/login');
+  console.log(' Car Auction System started on http://localhost:3000');
+  console.log(' WebSocket: ws://localhost:3000/auction');
+  console.log(' Register at: POST /auth/register');
+  console.log(' Login at: POST /auth/login');
 }
 
 bootstrap();
