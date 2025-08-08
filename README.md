@@ -20,6 +20,8 @@ Enterprise-grade real-time car auction platform built with NestJS, React, and We
 
 ##  Quick Start
 
+create a .env file and paste the details of .env.example
+
 # Backend
 docker-compose up -d ,
 npm install ,
