@@ -158,16 +158,23 @@ function AuctionPage() {
   };
 
   // Handle bid submission
-  const onSubmit = (data: BidFormData) => {
+    const onSubmit = (data: BidFormData) => {
     if (!auction) return;
     
-    const bidAmount = data.amount;
+    // ✅ Ensure we're sending a number
+    const bidAmount = Number(data.amount);
     const minimumBid = Math.max(auction.startingBid, currentHighestBid);
     
-    if (bidAmount <= minimumBid) {
-      toast.error(`Bid must be higher than ${formatCurrency(minimumBid)}`);
-      return;
+    if (isNaN(bidAmount) || bidAmount <= 0) {
+        toast.error('Please enter a valid bid amount');
+        return;
     }
+  
+    if (bidAmount <= minimumBid) {
+        toast.error(`Bid must be higher than ${formatCurrency(minimumBid)}`);
+        return;
+    }
+
 
     placeBid(auction.id, bidAmount);
     reset();

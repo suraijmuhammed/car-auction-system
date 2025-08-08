@@ -143,7 +143,7 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
   @SubscribeMessage('placeBid')
   async handlePlaceBid(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { auctionId: string; amount: number },
+    @MessageBody() data: { auctionId: string; amount: number | string },
   ) {
     if (!client.user) {
       client.emit('error', { message: 'Authentication required' });
@@ -161,9 +161,22 @@ export class AuctionGateway implements OnGatewayConnection, OnGatewayDisconnect 
     }
 
     try {
+      // ✅ Convert amount to number
+      const amount = typeof data.amount === 'string' ? parseFloat(data.amount) : data.amount;
+      
+      // ✅ Validate amount
+      if (isNaN(amount) || amount <= 0) {
+        client.emit('bidError', { 
+          message: 'Please enter a valid bid amount',
+          code: 'INVALID_AMOUNT'
+        });
+        return;
+      }
+
       const bidData = {
-        ...data,
+        auctionId: data.auctionId,
         userId: client.user.id,
+        amount: amount, // Use converted number
       };
 
       const bid = await this.bidService.placeBid(bidData);

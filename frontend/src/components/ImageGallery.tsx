@@ -138,7 +138,7 @@ function ImageGallery({ images, carMake, carModel, carYear }: ImageGalleryProps)
       try {
         await navigator.share({
           title: `${carYear} ${carMake} ${carModel}`,
-          text: `Check out this ${carYear} ${carMake} ${carModel} at Elite Auctions!`,
+          text: `Check out this ${carYear} ${carMake} ${carModel} at Royal Class Auctions!`,
           url: window.location.href,
         });
       } catch (error) {

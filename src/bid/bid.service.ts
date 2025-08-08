@@ -12,114 +12,121 @@ export class BidService {
   ) {}
 
   async placeBid(bidData: {
-    auctionId: string;
-    userId: string;
-    amount: number;
-  }) {
-    const { auctionId, userId, amount } = bidData;
+  auctionId: string;
+  userId: string;
+  amount: number | string; // Allow both number and string
+}) {
+  const { auctionId, userId, amount } = bidData;
 
-    // Start transaction for concurrency safety
-    return await this.prisma.$transaction(async (tx) => {
-      // Get current auction
-      const auction = await tx.auction.findUnique({
-        where: { id: auctionId },
-      });
-
-      if (!auction) {
-        throw new Error('Auction not found');
-      }
-
-      if (auction.status !== 'ACTIVE') {
-        throw new Error('Auction is not active');
-      }
-
-      // ✅ Fixed: Ensure bid is higher than BOTH starting bid AND current highest
-      const minimumBid = Math.max(auction.startingBid, auction.currentHighestBid);
-      
-      if (amount <= minimumBid) {
-        throw new Error(`Bid must be higher than $${minimumBid.toLocaleString()}`);
-      }
-
-      if (new Date() > auction.endTime) {
-        throw new Error('Auction has ended');
-      }
-
-      // Prevent user from bidding against themselves
-      const userLastBid = await tx.bid.findFirst({
-        where: { 
-          auctionId,
-          userId,
-          amount: auction.currentHighestBid
-        }
-      });
-
-      if (userLastBid) {
-        throw new Error('You cannot bid against yourself');
-      }
-
-      // Create the bid
-      const bid = await tx.bid.create({
-        data: {
-          userId,
-          auctionId,
-          amount,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              fullName: true
-            }
-          },
-        },
-      });
-
-      // Update auction with new highest bid
-      await tx.auction.update({
-        where: { id: auctionId },
-        data: { currentHighestBid: amount },
-      });
-
-      // ✅ Enhanced: Cache bid in Redis with extended data for persistence
-      const bidCache = {
-        bidId: bid.id,
-        amount,
-        userId,
-        username: bid.user.username,
-        fullName: bid.user.fullName,
-        timestamp: bid.timestamp,
-        auctionId,
-      };
-      
-      await this.redis.cacheHighestBid(auctionId, bidCache);
-      // ✅ Also store in persistent bid history
-      await this.redis.addToBidHistory(auctionId, bidCache);
-
-      // Publish to RabbitMQ for processing
-      await this.rabbitmq.publishBidEvent({
-        bidId: bid.id,
-        auctionId,
-        userId,
-        amount,
-        timestamp: bid.timestamp,
-        username: bid.user.username,
-      });
-
-      // Publish real-time update via Redis
-      await this.redis.publishBidUpdate(auctionId, {
-        bidId: bid.id,
-        amount,
-        userId,
-        username: bid.user.username,
-        fullName: bid.user.fullName,
-        timestamp: bid.timestamp,
-      });
-
-      console.log(`💰 New bid: $${amount} by ${bid.user.username} on auction ${auctionId}`);
-      return bid;
-    });
+  // ✅ Convert amount to number if it's a string
+  const bidAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  // ✅ Validate the amount is a valid number
+  if (isNaN(bidAmount) || bidAmount <= 0) {
+    throw new Error('Invalid bid amount provided');
   }
+
+  // Start transaction for concurrency safety
+  return await this.prisma.$transaction(async (tx) => {
+    // Get current auction
+    const auction = await tx.auction.findUnique({
+      where: { id: auctionId },
+    });
+
+    if (!auction) {
+      throw new Error('Auction not found');
+    }
+
+    if (auction.status !== 'ACTIVE') {
+      throw new Error('Auction is not active');
+    }
+
+    // ✅ Use the converted number for comparison
+    const minimumBid = Math.max(auction.startingBid, auction.currentHighestBid);
+    
+    if (bidAmount <= minimumBid) {
+      throw new Error(`Bid must be higher than $${minimumBid.toLocaleString()}`);
+    }
+
+    if (new Date() > auction.endTime) {
+      throw new Error('Auction has ended');
+    }
+
+    // Prevent user from bidding against themselves
+    const userLastBid = await tx.bid.findFirst({
+      where: { 
+        auctionId,
+        userId,
+        amount: auction.currentHighestBid
+      }
+    });
+
+    if (userLastBid) {
+      throw new Error('You cannot bid against yourself');
+    }
+
+    // ✅ Create the bid with the converted number
+    const bid = await tx.bid.create({
+      data: {
+        userId,
+        auctionId,
+        amount: bidAmount, // Use the converted number
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true
+          }
+        },
+      },
+    });
+
+    // Update auction with new highest bid
+    await tx.auction.update({
+      where: { id: auctionId },
+      data: { currentHighestBid: bidAmount }, // Use the converted number
+    });
+
+    // Cache the highest bid in Redis
+    const bidCache = {
+      bidId: bid.id,
+      amount: bidAmount,
+      userId,
+      username: bid.user.username,
+      fullName: bid.user.fullName,
+      timestamp: bid.timestamp,
+      auctionId,
+    };
+    
+    await this.redis.cacheHighestBid(auctionId, bidCache);
+    await this.redis.addToBidHistory(auctionId, bidCache);
+
+    // Publish to RabbitMQ for processing
+    await this.rabbitmq.publishBidEvent({
+      bidId: bid.id,
+      auctionId,
+      userId,
+      amount: bidAmount,
+      timestamp: bid.timestamp,
+      username: bid.user.username,
+    });
+
+    // Publish real-time update via Redis
+    await this.redis.publishBidUpdate(auctionId, {
+      bidId: bid.id,
+      amount: bidAmount,
+      userId,
+      username: bid.user.username,
+      fullName: bid.user.fullName,
+      timestamp: bid.timestamp,
+    });
+
+    console.log(`💰 New bid: $${bidAmount} by ${bid.user.username} on auction ${auctionId}`);
+    return bid;
+  });
+}
 
   // ✅ Enhanced: Get complete bid history from database
   async getAuctionBids(auctionId: string) {
