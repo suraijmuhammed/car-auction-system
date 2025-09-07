@@ -46,7 +46,7 @@ function RegisterPage() {
           >
             <Car className="h-10 w-10 text-white" />
           </motion.div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Join Royal Class Car Auctions</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Join Premium Car Auctions</h2>
           <p className="text-gray-600">Create your account to start bidding on exclusive cars</p>
         </div>
 

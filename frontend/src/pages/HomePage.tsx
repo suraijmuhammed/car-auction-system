@@ -64,7 +64,7 @@ function HomePage() {
         className="text-center mb-12"
       >
         <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent mb-6">
-          Royal Class Car Auctions
+          Premium Car Auctions
         </h1>
         <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
           Experience the thrill of real-time bidding on the world's most exclusive supercars. 
@@ -82,7 +82,7 @@ function HomePage() {
               to="/register"
               className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              Join Royal Class Car Auctions
+              Join Premium Car Auctions
             </Link>
             <Link
               to="/login"

@@ -1,4 +1,4 @@
-# Royal Class Car Auction System
+# Premium Car Auction System
 
 ## Overview
 Enterprise-grade real-time car auction platform built with NestJS, React, and WebSockets.
@@ -11,7 +11,7 @@ Enterprise-grade real-time car auction platform built with NestJS, React, and We
 - **Frontend**: React + TypeScript + Tailwind
 - **Real-time**: WebSocket Gateway
 
-##  PDF Requirements 
+ 
 - WebSocket Gateway (NestJS + Socket.IO) -Done
 -  Database Integration (PostgreSQL + Prisma) -Done
 -  Redis Caching & Pub/Sub - Done
